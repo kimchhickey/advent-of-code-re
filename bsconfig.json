@@ -1,0 +1,25 @@
+{
+  "name": "advent-of-code-rescript",
+  "version": "0.1.0",
+  "sources": {
+    "dir": "src",
+    "subdirs": true
+  },
+  "package-specs": {
+    "module": "commonjs",
+    "in-source": true
+  },
+  "suffix": ".bs.js",
+  "bs-dependencies": [
+    "bs-bastet",
+    "relude",
+    "relude-parse"
+  ],
+  "bsc-flags": [
+    ""
+  ],
+  "warnings": {
+    "error": "+101"
+  },
+  "refmt": 3
+}
