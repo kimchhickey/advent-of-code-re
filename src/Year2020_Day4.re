@@ -1,3 +1,5 @@
+open Belt;
+
 let input =
   Node_fs.readFileAsUtf8Sync("input/Year2020_Day4.txt")
   ->Js.String2.split("\n\n");
@@ -47,21 +49,20 @@ module Passport = {
     let tokens = s->Js.String2.splitByRe([%re "/\s/"]);
     let kv =
       tokens
-      ->Belt.Array.map(token => {
-          let res =
-            Js.String2.split(token->Belt.Option.getWithDefault(""), ":");
-          (res->Belt.Array.getUnsafe(0), res->Belt.Array.getUnsafe(1));
+      ->Array.map(token => {
+          let res = Js.String2.split(token->Option.getWithDefault(""), ":");
+          (res->Array.getUnsafe(0), res->Array.getUnsafe(1));
         })
-      ->Belt.Map.String.fromArray;
+      ->Map.String.fromArray;
     Some({
-      byr: kv->Belt.Map.String.getExn("byr"),
-      iyr: kv->Belt.Map.String.getExn("iyr"),
-      eyr: kv->Belt.Map.String.getExn("eyr"),
-      hgt: kv->Belt.Map.String.getExn("hgt"),
-      hcl: kv->Belt.Map.String.getExn("hcl"),
-      ecl: kv->Belt.Map.String.getExn("ecl"),
-      pid: kv->Belt.Map.String.getExn("pid"),
-      cid: kv->Belt.Map.String.get("cid"),
+      byr: kv->Map.String.getExn("byr"),
+      iyr: kv->Map.String.getExn("iyr"),
+      eyr: kv->Map.String.getExn("eyr"),
+      hgt: kv->Map.String.getExn("hgt"),
+      hcl: kv->Map.String.getExn("hcl"),
+      ecl: kv->Map.String.getExn("ecl"),
+      pid: kv->Map.String.getExn("pid"),
+      cid: kv->Map.String.get("cid"),
     });
   };
   let parse = s =>
@@ -77,7 +78,7 @@ module Passport = {
   };
   let validateByRe = (s, re) => {
     switch (Js.String2.match(s, re)) {
-    | Some(a) when a[0] == s => s
+    | Some(a) when a->Array.getUnsafe(0) == s => s
     | _ => raise(Not_found)
     };
   };
@@ -130,17 +131,16 @@ module Passport = {
 };
 
 module Counter = {
-  let countUnvalidatedPassports: array(Passport.unvalidated) => int = Belt.Array.length;
-  let countValidPassports: array(Passport.validated) => int = Belt.Array.length;
+  let countUnvalidatedPassports: array(Passport.unvalidated) => int = Array.length;
+  let countValidPassports: array(Passport.validated) => int = Array.length;
 };
 
 // p1
-let unvalidatedPassports = input->Belt.Array.keepMap(s => s->Passport.parse);
+let unvalidatedPassports = input->Array.keepMap(s => s->Passport.parse);
 unvalidatedPassports->Counter.countUnvalidatedPassports->Js.log;
 
 // p2
-let passports =
-  unvalidatedPassports->Belt.Array.keepMap(r => r->Passport.validate);
+let passports = unvalidatedPassports->Array.keepMap(r => r->Passport.validate);
 passports->Counter.countValidPassports->Js.log;
 
 passports[0]->Js.log;
