@@ -3,7 +3,7 @@ let input =
   ->Js.String2.split("\n\n");
 
 module Passport = {
-  type unparsed_t = {
+  type unvalidated = {
     byr: string,
     iyr: string,
     eyr: string,
@@ -32,7 +32,7 @@ module Passport = {
   type pid = string;
   type cid = option(string);
 
-  type t = {
+  type validated = {
     byr,
     iyr,
     eyr,
@@ -43,53 +43,49 @@ module Passport = {
     cid,
   };
 
-  let read = str => {
-    let readExn = (s: string): option(unparsed_t) => {
-      let tokens = s->Js.String2.splitByRe([%re "/\s/"]);
-      let kv =
-        tokens
-        ->Belt.Array.map(token => {
-            let res =
-              Js.String2.split(token->Belt.Option.getWithDefault(""), ":");
-            (res->Belt.Array.getUnsafe(0), res->Belt.Array.getUnsafe(1));
-          })
-        ->Belt.Map.String.fromArray;
-
-      Some({
-        byr: kv->Belt.Map.String.getExn("byr"),
-        iyr: kv->Belt.Map.String.getExn("iyr"),
-        eyr: kv->Belt.Map.String.getExn("eyr"),
-        hgt: kv->Belt.Map.String.getExn("hgt"),
-        hcl: kv->Belt.Map.String.getExn("hcl"),
-        ecl: kv->Belt.Map.String.getExn("ecl"),
-        pid: kv->Belt.Map.String.getExn("pid"),
-        cid: kv->Belt.Map.String.get("cid"),
-      });
-    };
-
-    try(readExn(str)) {
+  let parseExn = (s: string): option(unvalidated) => {
+    let tokens = s->Js.String2.splitByRe([%re "/\s/"]);
+    let kv =
+      tokens
+      ->Belt.Array.map(token => {
+          let res =
+            Js.String2.split(token->Belt.Option.getWithDefault(""), ":");
+          (res->Belt.Array.getUnsafe(0), res->Belt.Array.getUnsafe(1));
+        })
+      ->Belt.Map.String.fromArray;
+    Some({
+      byr: kv->Belt.Map.String.getExn("byr"),
+      iyr: kv->Belt.Map.String.getExn("iyr"),
+      eyr: kv->Belt.Map.String.getExn("eyr"),
+      hgt: kv->Belt.Map.String.getExn("hgt"),
+      hcl: kv->Belt.Map.String.getExn("hcl"),
+      ecl: kv->Belt.Map.String.getExn("ecl"),
+      pid: kv->Belt.Map.String.getExn("pid"),
+      cid: kv->Belt.Map.String.get("cid"),
+    });
+  };
+  let parse = s =>
+    try(parseExn(s)) {
     | Not_found => None
     };
-  };
 
-  let parseIntInRange = (s, min, max) => {
+  let validateIntInRange = (s, min, max) => {
     switch (int_of_string(s)) {
     | v when v >= min && v <= max => v
     | _ => raise(Not_found)
     };
   };
-
-  let parseByRe = (s, re) => {
+  let validateByRe = (s, re) => {
     switch (Js.String2.match(s, re)) {
     | Some(a) when a[0] == s => s
     | _ => raise(Not_found)
     };
   };
 
-  let parseByr = s => s->parseIntInRange(1920, 2002);
-  let parseIyr = s => s->parseIntInRange(2010, 2020);
-  let parseEyr = s => s->parseIntInRange(2020, 2030);
-  let parseHgt = s => {
+  let validateByr = s => s->validateIntInRange(1920, 2002);
+  let validateIyr = s => s->validateIntInRange(2010, 2020);
+  let validateEyr = s => s->validateIntInRange(2020, 2030);
+  let validateHgt = s => {
     switch (
       Js.String2.substr(s, ~from=-2),
       Js.String2.substrAtMost(s, ~from=0, ~length=Js.String2.length(s) - 2)
@@ -100,8 +96,8 @@ module Passport = {
     | _ => raise(Not_found)
     };
   };
-  let parseHcl = s => s->parseByRe([%re "/(#)[0-9a-f]{6}/"]);
-  let parseEcl = s => {
+  let validateHcl = s => s->validateByRe([%re "/(#)[0-9a-f]{6}/"]);
+  let validateEcl = s => {
     switch (s) {
     | "amb" => AMB
     | "blu" => BLU
@@ -113,37 +109,38 @@ module Passport = {
     | _ => raise(Not_found)
     };
   };
-  let parsePid = s => s->parseByRe([%re "/[0-9]{9}/"]);
+  let validatePid = s => s->validateByRe([%re "/[0-9]{9}/"]);
 
-  let parse = unparsed => {
-    let parseExn = (r: unparsed_t): option(t) => {
-      Some({
-        byr: r.byr->parseByr,
-        iyr: r.iyr->parseIyr,
-        eyr: r.eyr->parseEyr,
-        hgt: r.hgt->parseHgt,
-        hcl: r.hcl->parseHcl,
-        ecl: r.ecl->parseEcl,
-        pid: r.pid->parsePid,
-        cid: r.cid,
-      });
-    };
-
-    try(parseExn(unparsed)) {
+  let validateExn = (r: unvalidated): option(validated) => {
+    Some({
+      byr: r.byr->validateByr,
+      iyr: r.iyr->validateIyr,
+      eyr: r.eyr->validateEyr,
+      hgt: r.hgt->validateHgt,
+      hcl: r.hcl->validateHcl,
+      ecl: r.ecl->validateEcl,
+      pid: r.pid->validatePid,
+      cid: r.cid,
+    });
+  };
+  let validate = p =>
+    try(validateExn(p)) {
     | Not_found => None
     };
-  };
 };
 
 module Counter = {
-  let countUnparsedPassports: array(Passport.unparsed_t) => int = Belt.Array.length;
-  let countPassports: array(Passport.t) => int = Belt.Array.length;
+  let countUnvalidatedPassports: array(Passport.unvalidated) => int = Belt.Array.length;
+  let countValidPassports: array(Passport.validated) => int = Belt.Array.length;
 };
 
 // p1
-let unparsedPassports = input->Belt.Array.keepMap(s => s->Passport.read);
-unparsedPassports->Counter.countUnparsedPassports->Js.log;
+let unvalidatedPassports = input->Belt.Array.keepMap(s => s->Passport.parse);
+unvalidatedPassports->Counter.countUnvalidatedPassports->Js.log;
 
 // p2
-let passports = unparsedPassports->Belt.Array.keepMap(r => r->Passport.parse);
-passports->Counter.countPassports->Js.log;
+let passports =
+  unvalidatedPassports->Belt.Array.keepMap(r => r->Passport.validate);
+passports->Counter.countValidPassports->Js.log;
+
+passports[0]->Js.log;
