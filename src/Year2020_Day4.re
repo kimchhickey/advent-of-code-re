@@ -136,11 +136,11 @@ module Counter = {
 };
 
 // p1
-let unvalidatedPassports = input->Array.keepMap(s => s->Passport.parse);
+let unvalidatedPassports = input->Array.keepMap(Passport.parse);
 unvalidatedPassports->Counter.countUnvalidatedPassports->Js.log;
 
 // p2
-let passports = unvalidatedPassports->Array.keepMap(r => r->Passport.validate);
+let passports = unvalidatedPassports->Array.keepMap(Passport.validate);
 passports->Counter.countValidPassports->Js.log;
 
 passports[0]->Js.log;
