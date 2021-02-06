@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@greenlabs/garter@^0.2.1":
+  version "0.2.3"
+  resolved "https://registry.yarnpkg.com/@greenlabs/garter/-/garter-0.2.3.tgz#1d09245a6f59bba55abee82f3fcb5df3dcb83f2d"
+  integrity sha512-DtWnS6P7Oh+GKX0b2BNeZxQB8+Z1N1ZpQSFsVvcQoE8FUlsvErcHZHa7bTnHJsRCQKmbHEOB7CgpyTw6vyEZHA==
+
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
   resolved "https://registry.yarnpkg.com/@sindresorhus/is/-/is-0.14.0.tgz#9fb3a3cf3132328151f353de4632e01e52102bea"

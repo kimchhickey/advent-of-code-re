@@ -177,6 +177,7 @@ _opam/
 /lib
 *.bs.js
 *.re.back
+.bsb.lock
 
 ### yarn ###
 # https://yarnpkg.com/advanced/qa#which-files-should-be-gitignored

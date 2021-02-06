@@ -19,6 +19,7 @@
     "relude-parse": "^0.8.0"
   },
   "dependencies": {
+    "@greenlabs/garter": "^0.2.1",
     "bs-bastet": "^1.2.5"
   }
 }
