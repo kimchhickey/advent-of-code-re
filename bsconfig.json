@@ -12,6 +12,7 @@
     "relude-parse",
     "@greenlabs/garter"
   ],
+  "ppx-flags": ["bs-let/ppx"],
   "suffix": ".bs.js",
   "package-specs": {
     "in-source": true,

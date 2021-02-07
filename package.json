@@ -13,6 +13,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "bs-let": "^0.1.16",
     "bs-platform": "^8.2.0",
     "nodemon": "^2.0.4",
     "relude": "^0.63.1",

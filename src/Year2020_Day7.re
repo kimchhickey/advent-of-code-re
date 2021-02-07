@@ -1,6 +1,10 @@
 open ReludeParse.Parser;
 
-let input = Node_fs.readFileAsUtf8Sync("input/Year2020_Day7.txt");
+module P = {
+  let let_ = bind;
+};
+
+let input = Node_fs.readFileAsUtf8Sync("input/Year2020_Day7.sample.txt");
 
 let listToString = l => l->Belt.List.reduce("", (a, b) => a ++ b);
 
@@ -13,15 +17,12 @@ let bagStringParser =
   <|> str("bag.")
   <|> str("bag");
 
-let bagParser: t(string) =
-  wordParser
-  <* wsStr
-  >>= (
-    adjective =>
-      wordParser
-      <* wsStr
-      >>= (color => bagStringParser <#> (_ => adjective ++ " " ++ color))
-  );
+let bagParser: t(string) = {
+  let%P adjective = wordParser <* wsStr;
+  let%P color = wordParser <* wsStr;
+  let%P _ = bagStringParser;
+  pure(adjective ++ " " ++ color);
+};
 
 let bagsParser: t((int, string)) =
   (anyUnsignedInt <* wsStr, bagParser)
@@ -59,6 +60,7 @@ let rec isConnected = (adjacencyList: array(bag), source, target, toVisit) => {
   if (children->Belt.Array.some(((_, vertex)) => vertex == target)) {
     true;
   } else {
+    // DFS -> 리스트를 스택처럼 사용
     let toVisit =
       children->Belt.Array.reduce(toVisit, (toVisit, vertex) =>
         toVisit->Belt.List.add(vertex)
