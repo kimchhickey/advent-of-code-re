@@ -1,5 +1,4 @@
 open ReludeParse.Parser;
-
 module P = {
   let let_ = bind;
 };
@@ -11,11 +10,7 @@ let listToString = l => l->Belt.List.reduce("", (a, b) => a ++ b);
 let wordParser = anyAlpha |> many <#> listToString;
 
 let bagStringParser =
-  str("bags, ")
-  <|> str("bags")
-  <|> str("bag, ")
-  <|> str("bag.")
-  <|> str("bag");
+  str("bags.") <|> str("bags") <|> str("bag.") <|> str("bag");
 
 let bagParser: t(string) = {
   let%P adjective = wordParser <* wsStr;
@@ -29,7 +24,7 @@ let bagsParser: t((int, string)) =
   |> mapTuple2((num, bag) => (num, bag));
 
 let bagsOrNoBagsParser =
-  str("no other bags.") <#> (_ => []) <|> many(bagsParser);
+  str("no other bags.") <#> (_ => []) <|> sepBy(str(", "), bagsParser);
 
 type bag = (string, array((int, string)));
 
@@ -37,19 +32,11 @@ let sentenceParser: t(bag) =
   (bagParser, wsStr *> str("contain") <* wsStr, bagsOrNoBagsParser)
   |> mapTuple3((bag, _, bags) => (bag, bags->Belt.List.toArray));
 
-let bags =
-  input
-  ->Js.String2.trim
-  ->Js.String2.split("\n")
-  ->Belt.Array.map(s => runParser(s, sentenceParser));
+let inputParser: t(array(bag)) = {
+  sentenceParser <* eol |> many <#> Belt.List.toArray;
+};
 
-let adjacencyList =
-  bags->Belt.Array.map(result => {
-    switch (result) {
-    | Belt.Result.Ok(v) => v
-    | Belt.Result.Error(_) => raise(Not_found)
-    }
-  });
+let bags = input->runParser(inputParser);
 
 let rec isConnected = (adjacencyList: array(bag), source, target, toVisit) => {
   let (_, children) =
@@ -60,7 +47,6 @@ let rec isConnected = (adjacencyList: array(bag), source, target, toVisit) => {
   if (children->Belt.Array.some(((_, vertex)) => vertex == target)) {
     true;
   } else {
-    // DFS -> 리스트를 스택처럼 사용
     let toVisit =
       children->Belt.Array.reduce(toVisit, (toVisit, vertex) =>
         toVisit->Belt.List.add(vertex)
@@ -79,7 +65,7 @@ let rec totalWeight = (adjacencyList, source) => {
     ->Belt.Array.keep(((vertex, _)) => vertex == source)
     ->Belt.Array.getExn(0);
 
-  if (children->Belt.Array.length == 0) {
+  if (children->Garter.Array.isEmpty) {
     0;
   } else {
     children->Belt.Array.reduce(0, (acc, (weight, vertex)) => {
@@ -90,13 +76,21 @@ let rec totalWeight = (adjacencyList, source) => {
 
 // p1
 Util.clog(
-  adjacencyList
-  ->Belt.Array.map(((vertex, _)) =>
-      isConnected(adjacencyList, vertex, "shiny gold", [])
-    )
-  ->Belt.Array.keep(v => v)
-  ->Belt.Array.length,
+  bags->Belt.Result.flatMap(l => {
+    let result =
+      l
+      ->Belt.Array.map(((vertex, _)) =>
+          isConnected(l, vertex, "shiny gold", [])
+        )
+      ->Belt.Array.keep(v => v)
+      ->Belt.Array.length;
+    Belt.Result.Ok(result);
+  }),
 );
 
 // p2
-Util.clog(totalWeight(adjacencyList, "shiny gold"));
+Util.clog(
+  Belt.Result.flatMap(bags, l =>
+    Belt.Result.Ok(totalWeight(l, "shiny gold"))
+  ),
+);
