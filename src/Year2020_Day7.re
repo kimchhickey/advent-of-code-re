@@ -1,36 +1,39 @@
 open ReludeParse.Parser;
+
 module P = {
   let let_ = bind;
 };
 
-let input = Node_fs.readFileAsUtf8Sync("input/Year2020_Day7.sample.txt");
-
-let listToString = l => l->Belt.List.reduce("", (a, b) => a ++ b);
-
-let wordParser = anyAlpha |> many <#> listToString;
-
-let bagStringParser =
-  str("bags.") <|> str("bags") <|> str("bag.") <|> str("bag");
-
-let bagParser: t(string) = {
-  let%P adjective = wordParser <* wsStr;
-  let%P color = wordParser <* wsStr;
-  let%P _ = bagStringParser;
-  pure(adjective ++ " " ++ color);
-};
-
-let bagsParser: t((int, string)) =
-  (anyUnsignedInt <* wsStr, bagParser)
-  |> mapTuple2((num, bag) => (num, bag));
-
-let bagsOrNoBagsParser =
-  str("no other bags.") <#> (_ => []) <|> sepBy(str(", "), bagsParser);
+let input = Node_fs.readFileAsUtf8Sync("input/Year2020_Day7.txt");
 
 type bag = (string, array((int, string)));
 
-let sentenceParser: t(bag) =
-  (bagParser, wsStr *> str("contain") <* wsStr, bagsOrNoBagsParser)
-  |> mapTuple3((bag, _, bags) => (bag, bags->Belt.List.toArray));
+let bagParser: t(string) = {
+  let wordParser =
+    anyAlpha |> many <#> (l => l->Belt.List.reduce("", (a, b) => a ++ b));
+
+  let%P adjective = wordParser <* wsStr;
+  let%P color = wordParser <* wsStr;
+  let%P _ = str("bags.") <|> str("bags") <|> str("bag.") <|> str("bag");
+  pure(adjective ++ " " ++ color);
+};
+
+let containParser = wsStr *> str("contain") <* wsStr;
+
+let bagsParser: t(array((int, string))) = {
+  let innerBagParser =
+    (anyUnsignedInt <* wsStr, bagParser)
+    |> mapTuple2((num, bag) => (num, bag));
+
+  str("no other bags.")
+  <#> (_ => [||])
+  <|> (sepBy(str(", "), innerBagParser) <#> (l => l->Belt.List.toArray));
+};
+
+let sentenceParser: t(bag) = {
+  (bagParser, containParser, bagsParser)
+  |> mapTuple3((bag, _, bags) => (bag, bags));
+};
 
 let inputParser: t(array(bag)) = {
   sentenceParser <* eol |> many <#> Belt.List.toArray;
@@ -38,11 +41,11 @@ let inputParser: t(array(bag)) = {
 
 let bags = input->runParser(inputParser);
 
-let rec isConnected = (adjacencyList: array(bag), source, target, toVisit) => {
+let rec isConnected = (adjacencyList, source, target, toVisit) => {
   let (_, children) =
     adjacencyList
-    ->Belt.Array.keep(((vertex, _)) => vertex == source)
-    ->Belt.Array.getExn(0);
+    ->Belt.Array.getBy(((vertex, _)) => vertex == source)
+    ->Belt.Option.getExn;
 
   if (children->Belt.Array.some(((_, vertex)) => vertex == target)) {
     true;
@@ -62,8 +65,8 @@ let rec isConnected = (adjacencyList: array(bag), source, target, toVisit) => {
 let rec totalWeight = (adjacencyList, source) => {
   let (_, children) =
     adjacencyList
-    ->Belt.Array.keep(((vertex, _)) => vertex == source)
-    ->Belt.Array.getExn(0);
+    ->Belt.Array.getBy(((vertex, _)) => vertex == source)
+    ->Belt.Option.getExn;
 
   if (children->Garter.Array.isEmpty) {
     0;
@@ -76,13 +79,12 @@ let rec totalWeight = (adjacencyList, source) => {
 
 // p1
 Util.clog(
-  bags->Belt.Result.flatMap(l => {
+  bags->Belt.Result.flatMap(bags => {
     let result =
-      l
-      ->Belt.Array.map(((vertex, _)) =>
-          isConnected(l, vertex, "shiny gold", [])
+      bags
+      ->Belt.Array.keep(((vertex, _)) =>
+          isConnected(bags, vertex, "shiny gold", [])
         )
-      ->Belt.Array.keep(v => v)
       ->Belt.Array.length;
     Belt.Result.Ok(result);
   }),
@@ -90,7 +92,7 @@ Util.clog(
 
 // p2
 Util.clog(
-  Belt.Result.flatMap(bags, l =>
-    Belt.Result.Ok(totalWeight(l, "shiny gold"))
+  Belt.Result.flatMap(bags, bags =>
+    Belt.Result.Ok(totalWeight(bags, "shiny gold"))
   ),
 );
