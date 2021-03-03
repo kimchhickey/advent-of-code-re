@@ -1,8 +1,6 @@
 open ReludeParse.Parser;
 
-let input = Node_fs.readFileAsUtf8Sync("input/Year2020_Day8.txt");
-
-type instruction =
+type instruction_t =
   | Acc(int)
   | Jmp(int)
   | Nop(int);
@@ -15,33 +13,29 @@ let instructionParser = {
   };
 
   many(
-    opParser("nop", arg => Nop(arg))
-    <|> opParser("acc", arg => Acc(arg))
-    <|> opParser("jmp", arg => Jmp(arg)),
+    opParser("nop", n => Nop(n))
+    <|> opParser("acc", n => Acc(n))
+    <|> opParser("jmp", n => Jmp(n)),
   )
   <#> (l => l->Belt.List.toArray);
 };
 
-let program = input->runParser(instructionParser)->Belt.Result.getExn;
+type status_t =
+  | Processing
+  | Terminated
+  | InfiniteLoop;
 
-type system = {
-  isTerminated: bool,
+type system_t = {
+  status: status_t,
   accumulator: int,
   instructionPointer: int,
   visited: Belt.Set.Int.t,
 };
 
-let initialSystem = {
-  isTerminated: false,
-  accumulator: 0,
-  instructionPointer: 0,
-  visited: Belt.Set.Int.empty,
-};
+let exec = (program, system) => {
+  let {status, accumulator, instructionPointer, visited} = system;
 
-let run = (program, system) => {
-  let {isTerminated, accumulator, instructionPointer, visited} = system;
-
-  let isTerminated' = ref(isTerminated);
+  let status' = ref(status);
   let accumulator' = ref(accumulator);
   let instructionPointer' = ref(instructionPointer + 1);
   let visited' = visited->Belt.Set.Int.add(instructionPointer);
@@ -49,58 +43,73 @@ let run = (program, system) => {
   switch (program->Belt.Array.get(instructionPointer)) {
   | Some(op) =>
     switch (op) {
-    | Acc(arg) => accumulator' := accumulator + arg
-    | Jmp(arg) => instructionPointer' := instructionPointer + arg
+    | Acc(n) => accumulator' := accumulator + n
+    | Jmp(n) => instructionPointer' := instructionPointer + n
     | Nop(_) => ()
     }
-  | None => isTerminated' := true
+  | None => status' := Terminated
+  };
+
+  switch (visited->Belt.Set.Int.get(instructionPointer'.contents)) {
+  | Some(_) => status' := InfiniteLoop
+  | None => ()
   };
 
   {
-    isTerminated: isTerminated'.contents,
+    status: status'.contents,
     accumulator: accumulator'.contents,
     instructionPointer: instructionPointer'.contents,
     visited: visited',
   };
 };
 
-let rec until = (pred, f, x) => {
-  let x' = f(x);
-  switch (pred(x, x')) {
-  | Some(_) => x
-  | None => until(pred, f, x')
-  };
+let rec doUntil = (pred, f, x) => pred(x) ? x : doUntil(pred, f, f(x));
+
+module type P = {
+  let pred: system_t => bool;
+  let print: system_t => unit;
 };
 
-let pred = (x, x') =>
-  if (x.isTerminated) {
-    Some(0);
-  } else {
-    x.visited->Belt.Set.Int.get(x'.instructionPointer);
+// main
+let () = {
+  let input = Node_fs.readFileAsUtf8Sync("input/Year2020_Day8.txt");
+  let program = runParser(input, instructionParser)->Belt.Result.getExn;
+
+  let initialSystem = {
+    status: Processing,
+    accumulator: 0,
+    instructionPointer: 0,
+    visited: Belt.Set.Int.empty,
   };
 
-// p1
-until(pred, run(program), initialSystem).accumulator->Util.clog;
+  // part 1
+  module P1: P = {
+    let pred = s => s.status == InfiniteLoop;
+    let print = s => s.accumulator->Js.log;
+  };
+  doUntil(P1.pred, exec(program), initialSystem)->P1.print;
 
-// p2
-let arrayImmutableSet = (arr, i, v) => {
-  let arr' = arr->Belt.Array.copy;
-  arr'->Belt.Array.setExn(i, v);
-  arr';
+  // part 2
+  module P2: P = {
+    let pred = s => s.status == Terminated || s.status == InfiniteLoop;
+    let print = s => s.status == Terminated ? s.accumulator->Util.clog : ();
+  };
+
+  let swapAt = (arr, i, op) => {
+    let arr' = arr->Belt.Array.copy;
+    switch (op) {
+    | Jmp(n) => arr'->Belt.Array.setExn(i, Nop(n))
+    | Nop(n) => arr'->Belt.Array.setExn(i, Jmp(n))
+    | _ => ()
+    };
+    arr';
+  };
+
+  Belt.Array.forEachWithIndex(
+    program,
+    (i, op) => {
+      let program' = program->swapAt(i, op);
+      doUntil(P2.pred, exec(program'), initialSystem)->P2.print;
+    },
+  );
 };
-
-let logWhenTerminated: system => unit =
-  result => result.isTerminated ? result.accumulator->Util.clog : ();
-
-// p2
-Belt.Array.forEachWithIndex(program, (i, op) => {
-  switch (op) {
-  | Jmp(arg) =>
-    let program' = program->arrayImmutableSet(i, Nop(arg));
-    until(pred, run(program'), initialSystem)->logWhenTerminated;
-  | Nop(arg) =>
-    let program' = program->arrayImmutableSet(i, Jmp(arg));
-    until(pred, run(program'), initialSystem)->logWhenTerminated;
-  | _ => ()
-  }
-});
