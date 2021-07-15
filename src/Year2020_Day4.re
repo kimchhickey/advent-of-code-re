@@ -4,8 +4,8 @@ let input =
   Node_fs.readFileAsUtf8Sync("input/Year2020_Day4.txt")
   ->Js.String2.split("\n\n");
 
-module Passport = {
-  type unvalidated = {
+module NaivePassport = {
+  type t = {
     byr: string,
     iyr: string,
     eyr: string,
@@ -16,36 +16,7 @@ module Passport = {
     cid: option(string),
   };
 
-  type byr = int;
-  type iyr = int;
-  type eyr = int;
-  type hgt =
-    | In(int)
-    | Cm(int);
-  type hcl = string;
-  type ecl =
-    | AMB
-    | BLU
-    | BRN
-    | GRY
-    | GRN
-    | HZL
-    | OTH;
-  type pid = string;
-  type cid = option(string);
-
-  type validated = {
-    byr,
-    iyr,
-    eyr,
-    hgt,
-    hcl,
-    ecl,
-    pid,
-    cid,
-  };
-
-  let parseExn = (s: string): option(unvalidated) => {
+  let parseExn = (s: string): option(t) => {
     let tokens = s->Js.String2.splitByRe([%re "/\s/"]);
     let kv =
       tokens
@@ -65,28 +36,60 @@ module Passport = {
       cid: kv->Map.String.get("cid"),
     });
   };
+
   let parse = s =>
     try(parseExn(s)) {
     | Not_found => None
     };
+};
 
-  let validateIntInRange = (s, min, max) => {
+module Passport = {
+  type byr = int;
+  type iyr = int;
+  type eyr = int;
+  type hgt =
+    | In(int)
+    | Cm(int);
+  type hcl = string;
+  type ecl =
+    | AMB
+    | BLU
+    | BRN
+    | GRY
+    | GRN
+    | HZL
+    | OTH;
+  type pid = string;
+  type cid = option(string);
+
+  type t = {
+    byr,
+    iyr,
+    eyr,
+    hgt,
+    hcl,
+    ecl,
+    pid,
+    cid,
+  };
+
+  let parseIntInRange = (s, min, max) => {
     switch (int_of_string(s)) {
     | v when v >= min && v <= max => v
     | _ => raise(Not_found)
     };
   };
-  let validateByRe = (s, re) => {
+  let parseByRe = (s, re) => {
     switch (Js.String2.match(s, re)) {
     | Some(a) when a->Array.getUnsafe(0) == s => s
     | _ => raise(Not_found)
     };
   };
 
-  let validateByr = s => s->validateIntInRange(1920, 2002);
-  let validateIyr = s => s->validateIntInRange(2010, 2020);
-  let validateEyr = s => s->validateIntInRange(2020, 2030);
-  let validateHgt = s => {
+  let parseByr = s => s->parseIntInRange(1920, 2002);
+  let parseIyr = s => s->parseIntInRange(2010, 2020);
+  let parseEyr = s => s->parseIntInRange(2020, 2030);
+  let parseHgt = s => {
     switch (
       Js.String2.substr(s, ~from=-2),
       Js.String2.substrAtMost(s, ~from=0, ~length=Js.String2.length(s) - 2)
@@ -97,8 +100,8 @@ module Passport = {
     | _ => raise(Not_found)
     };
   };
-  let validateHcl = s => s->validateByRe([%re "/(#)[0-9a-f]{6}/"]);
-  let validateEcl = s => {
+  let parseHcl = s => s->parseByRe([%re "/(#)[0-9a-f]{6}/"]);
+  let parseEcl = s => {
     switch (s) {
     | "amb" => AMB
     | "blu" => BLU
@@ -110,37 +113,33 @@ module Passport = {
     | _ => raise(Not_found)
     };
   };
-  let validatePid = s => s->validateByRe([%re "/[0-9]{9}/"]);
+  let parsePid = s => s->parseByRe([%re "/[0-9]{9}/"]);
 
-  let validateExn = (r: unvalidated): option(validated) => {
+  let parseExn = (r: NaivePassport.t): option(t) => {
     Some({
-      byr: r.byr->validateByr,
-      iyr: r.iyr->validateIyr,
-      eyr: r.eyr->validateEyr,
-      hgt: r.hgt->validateHgt,
-      hcl: r.hcl->validateHcl,
-      ecl: r.ecl->validateEcl,
-      pid: r.pid->validatePid,
+      byr: r.byr->parseByr,
+      iyr: r.iyr->parseIyr,
+      eyr: r.eyr->parseEyr,
+      hgt: r.hgt->parseHgt,
+      hcl: r.hcl->parseHcl,
+      ecl: r.ecl->parseEcl,
+      pid: r.pid->parsePid,
       cid: r.cid,
     });
   };
-  let validate = p =>
-    try(validateExn(p)) {
+
+  let parse = p =>
+    try(parseExn(p)) {
     | Not_found => None
     };
 };
 
-module Counter = {
-  let countUnvalidatedPassports: array(Passport.unvalidated) => int = Array.length;
-  let countValidPassports: array(Passport.validated) => int = Array.length;
-};
-
 // p1
-let unvalidatedPassports = input->Array.keepMap(Passport.parse);
-unvalidatedPassports->Counter.countUnvalidatedPassports->Js.log;
+input->Array.keepMap(NaivePassport.parse)->Array.length->Js.log;
 
 // p2
-let passports = unvalidatedPassports->Array.keepMap(Passport.validate);
-passports->Counter.countValidPassports->Js.log;
-
-passports[0]->Js.log;
+input
+->Array.keepMap(NaivePassport.parse)
+->Array.keepMap(Passport.parse)
+->Array.length
+->Js.log;
